@@ -184,7 +184,7 @@ final class AppModel: ObservableObject {
     func runMacAction(_ kind: MacActionKind, shortcut: String) {
         switch kind {
         case .none: break
-        case .lockScreen: if !MacActions.lockScreen() { MacActions.runShortcut("Lock Screen") }
+        case .lockScreen: MacActions.lockScreenOrShortcut()
         case .buzzBack: buzz(loops: 1)
         case .markMoment: markMoment()
         case .runShortcut: MacActions.runShortcut(shortcut)
@@ -204,7 +204,7 @@ final class AppModel: ObservableObject {
         if worn {
             if !behavior.wristOnShortcut.isEmpty { MacActions.runShortcut(behavior.wristOnShortcut) }
         } else {
-            if behavior.autoLockOnWristOff, !MacActions.lockScreen() { MacActions.runShortcut("Lock Screen") }
+            if behavior.autoLockOnWristOff { MacActions.lockScreenOrShortcut() }
             if !behavior.wristOffShortcut.isEmpty { MacActions.runShortcut(behavior.wristOffShortcut) }
         }
     }

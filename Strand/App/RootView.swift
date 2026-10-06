@@ -24,6 +24,17 @@ enum NavItem: String, CaseIterable, Identifiable, Hashable {
     case support = "Support"
 
     var id: String { rawValue }
+
+    /// Sidebar entries for this platform. Notification mirroring reads other apps' notifications,
+    /// which only macOS allows.
+    static var visibleCases: [NavItem] {
+        #if os(macOS)
+        allCases
+        #else
+        allCases.filter { $0 != .notifications }
+        #endif
+    }
+
     var icon: String {
         switch self {
         case .today: return "circle.hexagongrid.fill"
@@ -60,7 +71,7 @@ struct RootView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                List(NavItem.allCases, selection: $selection) { item in
+                List(NavItem.visibleCases, selection: $selection) { item in
                     Label(item.rawValue, systemImage: item.icon)
                         .font(.system(size: 13, weight: .medium))
                         .tag(item)
@@ -108,7 +119,12 @@ struct RootView: View {
         case .stress: StressView()
         case .appleHealth: AppleHealthView()
         case .dataSources: DataSourcesView()
-        case .notifications: NotificationSettingsView()
+        case .notifications:
+            #if os(macOS)
+            NotificationSettingsView()
+            #else
+            TodayView()
+            #endif
         case .automation: AutomationsView()
         case .settings: SettingsView()
         case .support: SupportView()

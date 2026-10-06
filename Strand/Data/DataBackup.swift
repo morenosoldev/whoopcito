@@ -1,5 +1,7 @@
 import Foundation
+#if os(macOS)
 import AppKit
+#endif
 import UniformTypeIdentifiers
 import WhoopStore
 
@@ -53,6 +55,7 @@ enum DataBackup {
         // Flush the WAL so the single .sqlite carries everything. Best-effort.
         let checkpointed = await checkpoint()
 
+        #if os(macOS)
         // Ask where to save.
         let panel = NSSavePanel()
         panel.title = "Export NOOP backup"
@@ -85,6 +88,25 @@ enum DataBackup {
         } catch {
             return .failure("Export failed: \(error.localizedDescription)")
         }
+        #else
+        // iOS: stage a copy in tmp, then let the user choose where it goes (Files, iCloud Drive, …).
+        let fm = FileManager.default
+        let staged = fm.temporaryDirectory.appendingPathComponent(defaultBackupName())
+        var exports = [staged]
+        do {
+            removeIfPresent(staged)
+            try fm.copyItem(at: dbURL, to: staged)
+            if !checkpointed {
+                copySidecarsIfPresent(from: dbURL, toMainBackup: staged)
+                exports += ["-wal", "-shm"].map { URL(fileURLWithPath: staged.path + $0) }
+                    .filter { fm.fileExists(atPath: $0.path) }
+            }
+        } catch {
+            return .failure("Export failed: \(error.localizedDescription)")
+        }
+        guard let dest = await DocumentPicker.export(exports) else { return .cancelled }
+        return .exported(dest)
+        #endif
     }
 
     // MARK: - Import
@@ -98,6 +120,7 @@ enum DataBackup {
         do { dbPath = try StorePaths.defaultDatabasePath() }
         catch { return .failure("Couldn't locate the NOOP database. \(error.localizedDescription)") }
 
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.title = "Import NOOP backup"
         panel.prompt = "Import"
@@ -107,6 +130,9 @@ enum DataBackup {
         panel.allowedContentTypes = sqliteContentTypes()
 
         guard panel.runModal() == .OK, let source = panel.url else { return .cancelled }
+        #else
+        guard let source = await DocumentPicker.open(sqliteContentTypes()) else { return .cancelled }
+        #endif
 
         let scoped = source.startAccessingSecurityScopedResource()
         defer { if scoped { source.stopAccessingSecurityScopedResource() } }

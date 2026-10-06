@@ -312,7 +312,7 @@ struct CompareView: View {
             }
             .foregroundStyle(selected.count >= maxSelection ? StrandPalette.textTertiary : StrandPalette.accent)
         }
-        .menuStyle(.borderlessButton)
+        .borderlessMenu()
         .fixedSize()
         .disabled(selected.count >= maxSelection)
         .accessibilityLabel("Add a metric to compare")
