@@ -41,7 +41,7 @@ cp "$PRODUCTS/NOOPiOS" "$APP/NOOP"
 for bundle in "$PRODUCTS"/*.bundle; do cp -R "$bundle" "$APP/"; done
 
 # Home-screen icon from the 1024px master (loose PNGs; no actool needed).
-ICON="$ROOT/Tools/noop_icon_1024.png"
+ICON="$HERE/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
 sips -z 120 120 "$ICON" --out "$APP/AppIcon60x60@2x.png" >/dev/null
 sips -z 180 180 "$ICON" --out "$APP/AppIcon60x60@3x.png" >/dev/null
 sips -z 152 152 "$ICON" --out "$APP/AppIcon76x76@2x~ipad.png" >/dev/null

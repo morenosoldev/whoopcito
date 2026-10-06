@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.noopapp
   deploymentTarget:
     macOS: "13.0"
+    iOS: "16.0"
   createIntermediateGroups: true
   groupSortPosition: top
 settings:
@@ -56,6 +57,59 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: NO
         COMBINE_HIDPI_IMAGES: YES
+    dependencies:
+      - package: WhoopProtocol
+      - package: WhoopStore
+      - package: StrandAnalytics
+      - package: StrandImport
+      - package: StrandDesign
+  # iOS app (TestFlight). Shares Strand/ minus the macOS-only files; built + uploaded by
+  # .github/workflows/testflight.yml. For local no-admin sideload builds see ios/build-ipa.sh.
+  NOOPiOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    configFiles:
+      Debug: ios/Signing.xcconfig
+      Release: ios/Signing.xcconfig
+    sources:
+      - path: Strand
+        excludes:
+          - "App/StrandApp.swift"
+          - "MenuBar/**"
+          - "Resources/**"
+          - "Data/NotificationSettingsStore.swift"
+          - "Screens/NotificationSettingsView.swift"
+      - path: ios/Sources/NOOPiOS/App
+      - path: ios/Resources
+        excludes:
+          - "Info.plist"
+    info:
+      path: ios/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: NOOP
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIRequiredDeviceCapabilities: [arm64, bluetooth-le]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes: [bluetooth-central]
+        NSBluetoothAlwaysUsageDescription: "NOOP connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device."
+    settings:
+      base:
+        PRODUCT_NAME: NOOP
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
     dependencies:
       - package: WhoopProtocol
       - package: WhoopStore

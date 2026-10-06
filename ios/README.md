@@ -37,6 +37,33 @@ XCODE_APP=/path/to/Xcode.app ios/build-ipa.sh
 
 With a free Apple ID the signature lasts **7 days**; re-sideload to refresh (your data stays).
 
+## TestFlight (via GitHub Actions)
+
+`.github/workflows/testflight.yml` builds with a real Xcode on a GitHub macOS runner, signs with a
+cloud-managed distribution certificate, and uploads to TestFlight. Your Mac is not involved, so no
+admin is needed. The Xcode target is `NOOPiOS` in `project.yml` (same sources as the SwiftPM
+package above, plus `ios/Resources/`: app icon, privacy manifest).
+
+One-time setup (needs a paid Apple Developer account):
+
+1. **Pick a bundle ID you own**, e.g. `dk.yourname.noop`. Bundle IDs are global; the default in
+   `Signing.xcconfig` is only a placeholder.
+2. **App Store Connect → Apps → +** → New App, iOS, with that bundle ID (register it under
+   Certificates, Identifiers & Profiles → Identifiers first if it isn't offered) and a unique name.
+   The upload fails if this app record doesn't exist.
+3. **App Store Connect → Users and Access → Integrations → App Store Connect API → +** — role
+   **Admin** (needed for cloud signing). Note the Key ID and Issuer ID; download the `.p8` (once only).
+4. On your GitHub fork → Settings → Secrets and variables → Actions:
+   - Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (paste the whole `.p8` file contents)
+   - Variables: `APPLE_TEAM_ID` (developer.apple.com → Membership), `IOS_BUNDLE_ID`
+5. Actions → TestFlight → Run workflow (or `gh workflow run testflight.yml`). The build number is
+   the workflow run number, so every run uploads a new build.
+6. In App Store Connect → TestFlight: add friends as **external testers** (public link or email).
+   The first build for external testers goes through Beta App Review (usually ~a day); later builds
+   of the same version usually don't. Internal testers skip review but must be users on your team.
+
+If the signing/export step fails, see the comment above the Archive step in the workflow.
+
 ## Known gaps on iOS
 
 - No Notifications screen (iOS can't read other apps' notifications).

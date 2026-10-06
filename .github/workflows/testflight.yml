@@ -1,0 +1,98 @@
+# Build the iOS app on a GitHub macOS runner (full Xcode, no local admin needed) and upload it
+# to TestFlight. Run it from the Actions tab or: gh workflow run testflight.yml
+#
+# One-time setup (see ios/README.md → TestFlight):
+#   secrets  ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8   App Store Connect API key (Admin role)
+#   vars     APPLE_TEAM_ID, IOS_BUNDLE_ID            your team ID + the bundle ID registered in App Store Connect
+name: TestFlight
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Check configuration
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          missing=""
+          for v in ASC_KEY_ID ASC_ISSUER_ID TEAM_ID BUNDLE_ID; do [ -n "${!v}" ] || missing="$missing $v"; done
+          [ -n "$ASC_KEY_P8" ] || missing="$missing ASC_KEY_P8"
+          if [ -n "$missing" ]; then echo "::error::Missing secrets/vars:$missing (see ios/README.md)"; exit 1; fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Configure signing
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          printf 'PRODUCT_BUNDLE_IDENTIFIER = %s\nDEVELOPMENT_TEAM = %s\n' "$BUNDLE_ID" "$TEAM_ID" > ios/Signing.local.xcconfig
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" \
+            -c "Add :destination string upload" \
+            -c "Add :signingStyle string automatic" \
+            -c "Add :teamID string $TEAM_ID" \
+            -c "Add :uploadSymbols bool true" \
+            -c "Add :manageAppVersionAndBuildNumber bool false" \
+            "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # Archive unsigned, then let the export step sign with a cloud-managed Apple Distribution
+      # certificate via the API key — no certificates or profiles to store as secrets.
+      # If export fails on signing: drop CODE_SIGNING_ALLOWED=NO here and pass the same
+      # -allowProvisioningUpdates/-authenticationKey* flags to this step so Xcode signs the archive.
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project Strand.xcodeproj -scheme NOOPiOS -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/NOOP.xcarchive" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)"
+
+      - name: Sign and upload to TestFlight
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/NOOP.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-log
+          path: ${{ runner.temp }}/archive.log
+          if-no-files-found: ignore
+
+      - name: Clean up key
+        if: always()
+        run: rm -f "$ASC_KEY_PATH"

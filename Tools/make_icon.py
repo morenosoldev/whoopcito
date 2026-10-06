@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Generate the NOOP app icon: dark squircle + mint→emerald pulse waveform with glow."""
+"""Generate the NOOP app icon: dark squircle + mint→emerald pulse waveform with glow.
+
+`--ios` writes the full-bleed, opaque App Store variant (iOS applies its own corner mask).
+"""
 import os
+import sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 S = 1024
 # --- rounded-rect dark gradient background ---
 inset, radius = 76, 205
+IOS = "--ios" in sys.argv
+bg_inset, bg_radius = (0, 0) if IOS else (inset, radius)
 top = np.array([0x0B, 0x0D, 0x12], float)
 bot = np.array([0x14, 0x18, 0x24], float)
 grad = np.zeros((S, S, 3), float)
@@ -23,15 +29,16 @@ for c in range(3):
 
 bg = Image.fromarray(grad.astype(np.uint8), "RGB").convert("RGBA")
 mask = Image.new("L", (S, S), 0)
-ImageDraw.Draw(mask).rounded_rectangle([inset, inset, S - inset, S - inset], radius=radius, fill=255)
+ImageDraw.Draw(mask).rounded_rectangle([bg_inset, bg_inset, S - bg_inset, S - bg_inset], radius=bg_radius, fill=255)
 icon = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 icon.paste(bg, (0, 0), mask)
 
 # subtle top inner sheen
 sheen = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 sd = ImageDraw.Draw(sheen)
-sd.rounded_rectangle([inset, inset, S - inset, S - inset], radius=radius,
-                     outline=(255, 255, 255, 26), width=2)
+if not IOS:
+    sd.rounded_rectangle([inset, inset, S - inset, S - inset], radius=radius,
+                         outline=(255, 255, 255, 26), width=2)
 icon = Image.alpha_composite(icon, sheen)
 
 # --- pulse / ECG waveform (mint -> emerald gradient), with glow ---
@@ -80,5 +87,11 @@ icon = Image.alpha_composite(icon, stroke)
 # clip everything to the rounded mask
 icon.putalpha(Image.composite(icon.getchannel("A"), Image.new("L", (S, S), 0), mask))
 
-icon.save(os.path.join(os.path.dirname(os.path.abspath(__file__)), "noop_icon_1024.png"))
-print("wrote noop_icon_1024.png")
+here = os.path.dirname(os.path.abspath(__file__))
+if IOS:
+    out = os.path.join(here, "..", "ios", "Resources", "Assets.xcassets", "AppIcon.appiconset", "AppIcon-1024.png")
+    icon.convert("RGB").save(out)   # App Store rejects icons with an alpha channel
+else:
+    out = os.path.join(here, "noop_icon_1024.png")
+    icon.save(out)
+print("wrote", os.path.normpath(out))

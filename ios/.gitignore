@@ -1,2 +1,4 @@
 .build/
 build/
+Signing.local.xcconfig
+Resources/Info.plist
