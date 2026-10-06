@@ -1,6 +1,6 @@
-# NOOP for iPhone
+# Whoopcito — NOOP for iPhone
 
-An iOS build of the NOOP app, produced **without `xcodebuild`** — so it works on a Mac where you
+An iOS build of the NOOP app (shown on the home screen and in TestFlight as **Whoopcito**), produced **without `xcodebuild`** — so it works on a Mac where you
 can't get admin rights (Xcode's license acceptance and first-launch setup both need admin).
 Device-only: there is no simulator path (CoreSimulator is installed by Xcode's admin-only first
 launch), and BLE needs a real phone anyway.
@@ -46,8 +46,8 @@ package above, plus `ios/Resources/`: app icon, privacy manifest).
 
 One-time setup (needs a paid Apple Developer account):
 
-1. **Pick a bundle ID you own**, e.g. `dk.yourname.noop`. Bundle IDs are global; the default in
-   `Signing.xcconfig` is only a placeholder.
+1. **Pick a bundle ID you own**, e.g. `dk.morenosoldev.whoopcito` (the default in
+   `Signing.xcconfig`). Bundle IDs are global, so change it if that one is taken.
 2. **App Store Connect → Apps → +** → New App, iOS, with that bundle ID (register it under
    Certificates, Identifiers & Profiles → Identifiers first if it isn't offered) and a unique name.
    The upload fails if this app record doesn't exist.

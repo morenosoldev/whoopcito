@@ -87,7 +87,7 @@ targets:
     info:
       path: ios/Resources/Info.plist
       properties:
-        CFBundleDisplayName: NOOP
+        CFBundleDisplayName: Whoopcito
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
@@ -103,7 +103,7 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIBackgroundModes: [bluetooth-central]
-        NSBluetoothAlwaysUsageDescription: "NOOP connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device."
+        NSBluetoothAlwaysUsageDescription: "Whoopcito connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device."
     settings:
       base:
         PRODUCT_NAME: NOOP

@@ -52,10 +52,10 @@ cat > "$APP/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key><string>en</string>
-	<key>CFBundleDisplayName</key><string>NOOP</string>
+	<key>CFBundleDisplayName</key><string>Whoopcito</string>
 	<key>CFBundleName</key><string>NOOP</string>
 	<key>CFBundleExecutable</key><string>NOOP</string>
-	<key>CFBundleIdentifier</key><string>com.noopapp.noop.ios</string>
+	<key>CFBundleIdentifier</key><string>dk.morenosoldev.whoopcito</string>
 	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>0.1.0</string>
@@ -92,7 +92,7 @@ cat > "$APP/Info.plist" <<PLIST
 	</array>
 	<key>UIBackgroundModes</key><array><string>bluetooth-central</string></array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>NOOP connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device.</string>
+	<string>Whoopcito connects directly to your WHOOP strap over Bluetooth to read heart rate, R-R intervals, battery, and sensor data locally on your iPhone. Nothing leaves your device.</string>
 	<key>ITSAppUsesNonExemptEncryption</key><false/>
 </dict>
 </plist>

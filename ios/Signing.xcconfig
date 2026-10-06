@@ -1,7 +1,7 @@
 // Signing identity for the NOOPiOS (TestFlight) target. Bundle IDs are global across all Apple
 // developers, so set your own: CI writes Signing.local.xcconfig from repo variables/secrets;
 // locally you can create it by hand (it's gitignored).
-PRODUCT_BUNDLE_IDENTIFIER = com.noopapp.noop.ios
+PRODUCT_BUNDLE_IDENTIFIER = dk.morenosoldev.whoopcito
 DEVELOPMENT_TEAM =
 
 #include? "Signing.local.xcconfig"
