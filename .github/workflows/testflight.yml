@@ -1,0 +1,119 @@
+# Whoopcito: build upstream NOOP's iOS app (NOOPiOS + widgets + watch app) under our own bundle
+# IDs and upload it to TestFlight. Run from the Actions tab or: gh workflow run testflight.yml
+#
+# Setup (repo Settings → Secrets and variables → Actions):
+#   secrets  ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8   App Store Connect API key (Admin role)
+#   vars     APPLE_TEAM_ID                            developer team ID
+#            IOS_BUNDLE_ID                            app bundle ID, e.g. dk.morenosoldev.whoopcito
+#            IOS_DISPLAY_NAME (optional)              home-screen name, default "Whoopcito"
+#
+# IOS_BUNDLE_ID is split into BUNDLE_ID_PREFIX (dk.morenosoldev) + app name (whoopcito); every
+# upstream "$(BUNDLE_ID_PREFIX).noop…" identifier (widgets, watch, App Group) is renamed to match.
+name: TestFlight
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+      DISPLAY_NAME: ${{ vars.IOS_DISPLAY_NAME || 'Whoopcito' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Check configuration
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          missing=""
+          for v in ASC_KEY_ID ASC_ISSUER_ID TEAM_ID BUNDLE_ID ASC_KEY_P8; do [ -n "${!v}" ] || missing="$missing $v"; done
+          if [ -n "$missing" ]; then echo "::error::Missing secrets/vars:$missing"; exit 1; fi
+          case "$BUNDLE_ID" in *.*.*) ;; *) echo "::error::IOS_BUNDLE_ID must look like dk.yourname.app"; exit 1;; esac
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Configure identifiers and signing
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          PREFIX="${BUNDLE_ID%.*}"
+          APP="${BUNDLE_ID##*.}"
+          printf 'BUNDLE_ID_PREFIX = %s\nDEVELOPMENT_TEAM = %s\n' "$PREFIX" "$TEAM_ID" > Config/BundleIdSecrets.xcconfig
+          # $(BUNDLE_ID_PREFIX).noop… → $(BUNDLE_ID_PREFIX).<app>… (app, widgets, watch, App Group)
+          sed -i '' "s/\$(BUNDLE_ID_PREFIX)\.noop/\$(BUNDLE_ID_PREFIX).$APP/g" project.yml
+          sed -i '' "s/CFBundleDisplayName: NOOP\$/CFBundleDisplayName: \"$DISPLAY_NAME\"/" project.yml
+          grep -n 'BUNDLE_ID_PREFIX)\.\|CFBundleDisplayName' project.yml
+
+          # Upstream build number + run number keeps every upload unique within a version.
+          UPSTREAM_BUILD=$(sed -n 's/^ *CURRENT_PROJECT_VERSION: *"\{0,1\}\([0-9]*\)"\{0,1\}.*/\1/p' project.yml | head -1)
+          echo "BUILD_NUMBER=${UPSTREAM_BUILD}.${{ github.run_number }}" >> "$GITHUB_ENV"
+
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" \
+            -c "Add :destination string upload" \
+            -c "Add :signingStyle string automatic" \
+            -c "Add :teamID string $TEAM_ID" \
+            -c "Add :uploadSymbols bool true" \
+            -c "Add :manageAppVersionAndBuildNumber bool false" \
+            "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # Signed at archive time (automatic signing via the API key) so the HealthKit and App Group
+      # entitlements are embedded; Xcode registers the bundle IDs / App Group as needed.
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project Strand.xcodeproj -scheme NOOPiOS -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/NOOP.xcarchive" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)"
+
+      - name: Sign and upload to TestFlight
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/NOOP.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-log
+          path: ${{ runner.temp }}/archive.log
+          if-no-files-found: ignore
+
+      - name: Clean up key
+        if: always()
+        run: rm -f "$ASC_KEY_PATH"

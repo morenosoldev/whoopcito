@@ -118,3 +118,7 @@ tools/linux-capture/*.db
 tools/linux-capture/*.db-wal
 tools/linux-capture/*.db-shm
 tools/linux-capture/captures/
+
+# App Store Connect API keys — never commit
+*.p8
+AuthKey_*
